@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Infant Star Tap Game - Twinkle + Rotation + Pop Sound</title>
+  <title>Star Game</title>
   <style>
     body {
       margin: 0;
@@ -12,6 +12,30 @@
     canvas {
       display: block;
       background: black;
+    }
+    /* Pause button */
+    #pauseButton {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      width: 44px;
+      height: 44px;
+      display: none; /* shown after game starts */
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      font-size: 18px;
+      line-height: 1;
+      z-index: 9; /* under start overlay (10) */
+      cursor: pointer;
+      backdrop-filter: blur(2px);
+      transition: transform 0.06s ease;
+    }
+    #pauseButton:active {
+      transform: scale(0.96);
     }
     /* Start screen overlay */
     #startScreen {
@@ -79,6 +103,12 @@
       accent-color: #4ade80;
       cursor: pointer;
     }
+    #randomizeColor {
+      width: 44px;
+      height: 24px;
+      accent-color: #4ade80;
+      cursor: pointer;
+    }
     #playButton {
       position: absolute;
       bottom: 40px;
@@ -105,11 +135,15 @@
 </head>
 <body>
   <div id="startScreen">
-    <div id="title">Star Tap</div>
+    <div id="title">Star Game</div>
     <div id="optionsPanel">
       <div class="optRow">
         <label for="shapeColor">Shape color</label>
         <input id="shapeColor" type="color" value="#ffffff" aria-label="Shape color" />
+      </div>
+      <div class="optRow">
+        <label for="randomizeColor">Randomize color</label>
+        <input id="randomizeColor" type="checkbox" checkedaria-label="Randomize color" />
       </div>
       <div class="optRow">
         <label for="soundEnabled">Sound</label>
@@ -119,6 +153,7 @@
     <button id="playButton" type="button">PLAY</button>
   </div>
   <canvas id="gameCanvas"></canvas>
+  <button id="pauseButton" type="button" aria-label="Pause game">⏸</button>
 
   <script>
     const canvas = document.getElementById("gameCanvas");
@@ -127,14 +162,30 @@
     const playButton = document.getElementById("playButton");
     const colorInput = document.getElementById("shapeColor");
     const soundToggle = document.getElementById("soundToggle");
+    const randomizeToggle = document.getElementById("randomizeColor");
+    const pauseButton = document.getElementById("pauseButton");
 
     // Game settings (populated from start screen)
     const gameSettings = {
       shapeColor: "#ffffff",
       soundEnabled: true,
+      randomizeColor: false,
     };
     let isGameRunning = false;
     let spawnIntervalId = null;
+    
+    function getRandomColor() {
+      const hue = Math.floor(Math.random() * 360);
+      return `hsl(${hue}, 90%, 60%)`;
+    }
+    
+    function updateColorInputDisabled() {
+      const disabled = !!randomizeToggle.checked;
+      colorInput.disabled = disabled;
+      colorInput.style.opacity = disabled ? 0.6 : 1;
+    }
+    randomizeToggle.addEventListener("change", updateColorInputDisabled);
+    updateColorInputDisabled();
 
     function resizeCanvas() {
       canvas.width = window.innerWidth;
@@ -249,7 +300,8 @@
       const size = 72 + Math.random() * 120; // doubled from 36 + random*60
       const x = Math.random() * (canvas.width - size);
       const y = Math.random() * (canvas.height - size);
-      stars.push(new Star(x, y, size, gameSettings.shapeColor));
+      const color = gameSettings.randomizeColor ? getRandomColor() : gameSettings.shapeColor;
+      stars.push(new Star(x, y, size, color));
     }
 
     // Will be started when the game begins
@@ -310,6 +362,7 @@
       // Read options
       gameSettings.shapeColor = colorInput.value || "#ffffff";
       gameSettings.soundEnabled = !!soundToggle.checked;
+      gameSettings.randomizeColor = !!randomizeToggle.checked;
 
       // Hide start screen
       startScreen.style.display = "none";
@@ -318,7 +371,24 @@
       isGameRunning = true;
       startSpawning();
       // Seed a few stars instantly so it feels alive
-      for (let i = 0; i < 4; i++) spawnStar();
+      if (stars.length === 0) {
+        for (let i = 0; i < 4; i++) spawnStar();
+      }
+      // Show pause button
+      pauseButton.style.display = "inline-flex";
+    });
+
+    // Pause button behavior
+    pauseButton.addEventListener("click", () => {
+      isGameRunning = false;
+      // Sync UI from current settings
+      colorInput.value = gameSettings.shapeColor;
+      soundToggle.checked = !!gameSettings.soundEnabled;
+      randomizeToggle.checked = !!gameSettings.randomizeColor;
+      updateColorInputDisabled();
+      // Show overlay and hide pause
+      startScreen.style.display = "flex";
+      pauseButton.style.display = "none";
     });
 
     // Kick off the render loop; it idles until the game starts
