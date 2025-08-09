@@ -68,7 +68,7 @@
     }
     #optionsPanel {
       width: min(520px, 92vw);
-      margin: 0 auto 16vh;
+      margin: 0 auto 24px;
       background: rgba(255,255,255,0.06);
       border: 1px solid rgba(255,255,255,0.12);
       border-radius: 16px;
@@ -131,25 +131,45 @@
       transform: translateX(-50%) scale(0.98);
       filter: brightness(0.98);
     }
+    #fullscreenButton {
+      display: block;
+      margin: 0 auto calc(40px + clamp(56px, 10vh, 84px) + 16px);
+      width: min(300px, 80vw);
+      height: clamp(44px, 8vh, 56px);
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.35);
+      background: rgba(255,255,255,0.06);
+      color: #fff;
+      font-size: clamp(16px, 4vw, 20px);
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: transform 0.06s ease, filter 0.2s ease;
+    }
+    #fullscreenButton:active {
+      transform: scale(0.98);
+      filter: brightness(0.98);
+    }
   </style>
 </head>
 <body>
   <div id="startScreen">
     <div id="title">Star Game</div>
-    <div id="optionsPanel">
+    <div id="optionsPanel" role="group" aria-label="Options">
       <div class="optRow">
         <label for="shapeColor">Shape color</label>
         <input id="shapeColor" type="color" value="#ffffff" aria-label="Shape color" />
       </div>
       <div class="optRow">
         <label for="randomizeColor">Randomize color</label>
-        <input id="randomizeColor" type="checkbox" checkedaria-label="Randomize color" />
+        <input id="randomizeColor" type="checkbox" checked aria-label="Randomize color" />
       </div>
       <div class="optRow">
         <label for="soundEnabled">Sound</label>
         <input id="soundToggle" type="checkbox" checked aria-label="Sound on/off" />
       </div>
     </div>
+    <button id="fullscreenButton" type="button">Full Screen</button>
     <button id="playButton" type="button">PLAY</button>
   </div>
   <canvas id="gameCanvas"></canvas>
@@ -164,6 +184,7 @@
     const soundToggle = document.getElementById("soundToggle");
     const randomizeToggle = document.getElementById("randomizeColor");
     const pauseButton = document.getElementById("pauseButton");
+    const fullscreenButton = document.getElementById("fullscreenButton");
 
     // Game settings (populated from start screen)
     const gameSettings = {
@@ -390,6 +411,16 @@
       startScreen.style.display = "flex";
       pauseButton.style.display = "none";
     });
+
+    // Fullscreen behavior
+    function enterFullscreen() {
+      const el = document.documentElement;
+      const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+      if (req) {
+        try { req.call(el); } catch (e) { /* noop */ }
+      }
+    }
+    fullscreenButton.addEventListener("click", enterFullscreen);
 
     // Kick off the render loop; it idles until the game starts
     gameLoop();
