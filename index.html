@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Infant Star Tap Game - Twinkle + Rotation + Pop Sound</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: black;
+    }
+    canvas {
+      display: block;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+
+    // --- Gentle Pop Sound using Web Audio API ---
+    function playPopSound() {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(600, audioCtx.currentTime); // start freq
+      oscillator.frequency.exponentialRampToValueAtTime(
+        200,
+        audioCtx.currentTime + 0.15
+      ); // end freq
+
+      gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime); // soft volume
+      gainNode.gain.exponentialRampToValueAtTime(
+        0.001,
+        audioCtx.currentTime + 0.15
+      );
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      oscillator.start();
+      oscillator.stop(audioCtx.currentTime + 0.15);
+    }
+
+    // --- SVG STAR GENERATOR ---
+    function createStarSVG(size) {
+      const points = 5;
+      const outerRadius = size / 2;
+      const innerRadius = outerRadius / 2.5;
+      let path = "";
+      for (let i = 0; i < points * 2; i++) {
+        const angle = (Math.PI / points) * i;
+        const r = i % 2 === 0 ? outerRadius : innerRadius;
+        const x = outerRadius + r * Math.sin(angle);
+        const y = outerRadius - r * Math.cos(angle);
+        path += (i === 0 ? "M" : "L") + x + "," + y;
+      }
+      path += "Z";
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">
+        <path d="${path}" fill="white" />
+      </svg>`;
+      return "data:image/svg+xml;base64," + btoa(svg);
+    }
+
+    // Star object
+    class Star {
+      constructor(x, y, size) {
+        this.x = x;
+        this.y = y;
+        this.size = size;
+        this.img = new Image();
+        this.img.src = createStarSVG(size);
+        this.clicked = false;
+        this.scale = 1;
+        this.alpha = 1;
+        this.rotation = Math.random() * Math.PI * 2; // random rotation
+        this.twinklePhase = Math.random() * Math.PI * 2; // random start for twinkle
+      }
+
+      draw() {
+        ctx.save();
+        ctx.globalAlpha = this.alpha;
+        ctx.translate(this.x + this.size / 2, this.y + this.size / 2);
+        ctx.rotate(this.rotation);
+        ctx.scale(this.scale, this.scale);
+        ctx.drawImage(
+          this.img,
+          -this.size / 2,
+          -this.size / 2,
+          this.size,
+          this.size
+        );
+        ctx.restore();
+      }
+
+      update() {
+        if (this.clicked) {
+          // Disappear animation
+          this.scale *= 0.9;
+          this.alpha *= 0.85;
+          if (this.alpha < 0.05) {
+            return false; // remove star
+          }
+        } else {
+          // Twinkle animation (gentle pulsing)
+          this.twinklePhase += 0.05;
+          this.scale = 1 + Math.sin(this.twinklePhase) * 0.05;
+        }
+        return true;
+      }
+
+      containsPoint(px, py) {
+        return (
+          px >= this.x &&
+          px <= this.x + this.size &&
+          py >= this.y &&
+          py <= this.y + this.size
+        );
+      }
+    }
+
+    const stars = [];
+
+    function spawnStar() {
+      // Increased size range by 20%
+      const size = 72 + Math.random() * 120; // doubled from 36 + random*60
+      const x = Math.random() * (canvas.width - size);
+      const y = Math.random() * (canvas.height - size);
+      stars.push(new Star(x, y, size));
+    }
+
+    // Spawn stars periodically
+    setInterval(() => {
+      if (stars.length < 10) {
+        spawnStar();
+      }
+    }, 1000);
+
+    // Handle clicks/touches
+    function handleInteraction(x, y) {
+      for (let i = stars.length - 1; i >= 0; i--) {
+        if (stars[i].containsPoint(x, y) && !stars[i].clicked) {
+          stars[i].clicked = true;
+          playPopSound(); // play gentle pop
+          break;
+        }
+      }
+    }
+
+    canvas.addEventListener("mousedown", (e) => {
+      const rect = canvas.getBoundingClientRect();
+      handleInteraction(e.clientX - rect.left, e.clientY - rect.top);
+    });
+
+    canvas.addEventListener("touchstart", (e) => {
+      const rect = canvas.getBoundingClientRect();
+      for (let touch of e.touches) {
+        handleInteraction(touch.clientX - rect.left, touch.clientY - rect.top);
+      }
+    });
+
+    function gameLoop() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (let i = stars.length - 1; i >= 0; i--) {
+        if (!stars[i].update()) {
+          stars.splice(i, 1);
+        } else {
+          stars[i].draw();
+        }
+      }
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    gameLoop();
+  </script>
+</body>
+</html>
