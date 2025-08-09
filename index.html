@@ -101,22 +101,25 @@
       cursor: pointer;
       user-select: none;
     }
-    #shapeColor {
-      width: 48px;
-      height: 32px;
-      border-radius: 6px;
-      border: 1px solid rgba(255,255,255,0.25);
-      background: transparent;
-      padding: 0;
-      cursor: pointer;
+    /* Score HUD */
+    #scoreHud {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      padding: 8px 14px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      z-index: 8;
+      display: none; /* shown on Medium/Hard */
+      user-select: none;
+      backdrop-filter: blur(2px);
     }
     #soundToggle {
-      width: 44px;
-      height: 24px;
-      accent-color: #4ade80;
-      cursor: pointer;
-    }
-    #randomizeColor {
       width: 44px;
       height: 24px;
       accent-color: #4ade80;
@@ -163,16 +166,77 @@
       transform: scale(0.98);
       filter: brightness(0.98);
     }
+    /* Legend panel */
+    #legendPanel {
+      width: min(620px, 92vw);
+      margin: 0 auto 18px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 16px;
+      padding: 14px 14px 10px;
+      backdrop-filter: blur(4px);
+      color: #eaeaea;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    #legendTitle {
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      margin: 2px 6px 8px;
+      color: #fff;
+    }
+    .legendGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(122px, 1fr));
+      gap: 10px 12px;
+      padding: 4px 4px 8px;
+    }
+    .legendItem {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 8px;
+      border-radius: 10px;
+      background: rgba(0,0,0,0.15);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .legendPoints {
+      margin-left: auto;
+      color: #fff;
+      font-weight: 700;
+    }
+    .legendStar {
+      width: 34px;
+      height: 34px;
+      flex: 0 0 auto;
+      display: inline-block;
+      background-size: cover;
+      background-position: center;
+      border-radius: 4px;
+      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.35));
+    }
+    /* Score delta popup */
+    .scorePopup {
+      position: absolute;
+      right: -8px;
+      top: -12px;
+      color: #22c55e;
+      font-weight: 800;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.45);
+      opacity: 0;
+      animation: scorePop 750ms ease-out forwards;
+      pointer-events: none;
+    }
+    @keyframes scorePop {
+      0%   { transform: translateY(0) scale(0.9); opacity: 0; }
+      20%  { transform: translateY(-6px) scale(1);   opacity: 1; }
+      100% { transform: translateY(-22px) scale(1);  opacity: 0; }
+    }
   </style>
 </head>
 <body>
   <div id="startScreen">
     <div id="title">Star Game</div>
     <div id="optionsPanel" role="group" aria-label="Options">
-      <div class="optRow">
-        <label for="shapeColor">Shape color</label>
-        <input id="shapeColor" type="color" value="#ffffff" aria-label="Shape color" />
-      </div>
       <div class="optRow">
         <span>Difficulty</span>
         <div class="difficultyGroup" role="radiogroup" aria-label="Difficulty">
@@ -182,54 +246,94 @@
         </div>
       </div>
       <div class="optRow">
-        <label for="randomizeColor">Randomize color</label>
-        <input id="randomizeColor" type="checkbox" checked aria-label="Randomize color" />
-      </div>
-      <div class="optRow">
         <label for="soundEnabled">Sound</label>
         <input id="soundToggle" type="checkbox" checked aria-label="Sound on/off" />
       </div>
+    </div>
+    <div id="legendPanel" aria-label="Points legend">
+      <div id="legendTitle">Points</div>
+      <div class="legendGrid" id="legendGrid"></div>
     </div>
     <button id="fullscreenButton" type="button">Full Screen</button>
     <button id="playButton" type="button">PLAY</button>
   </div>
   <canvas id="gameCanvas"></canvas>
   <button id="pauseButton" type="button" aria-label="Pause game">⏸</button>
+  <div id="scoreHud">0</div>
 
   <script>
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
     const startScreen = document.getElementById("startScreen");
     const playButton = document.getElementById("playButton");
-    const colorInput = document.getElementById("shapeColor");
     const soundToggle = document.getElementById("soundToggle");
-    const randomizeToggle = document.getElementById("randomizeColor");
     const pauseButton = document.getElementById("pauseButton");
     const fullscreenButton = document.getElementById("fullscreenButton");
     const difficultyInputs = Array.from(document.querySelectorAll('input[name="difficulty"]'));
+    const scoreHud = document.getElementById("scoreHud");
+    const legendGrid = document.getElementById("legendGrid");
 
     // Game settings (populated from start screen)
     const gameSettings = {
-      shapeColor: "#ffffff",
       soundEnabled: true,
-      randomizeColor: false,
       difficulty: "easy",
     };
     let isGameRunning = false;
     let spawnIntervalId = null;
+    let score = 0;
     
-    function getRandomColor() {
-      const hue = Math.floor(Math.random() * 360);
-      return `hsl(${hue}, 90%, 60%)`;
+    // Color tiers for Medium/Hard: 16 colors with ascending point values
+    const colorTiers = [
+      { color: "#ffffff", points: 1 },
+      { color: "#b3e5ff", points: 2 },
+      { color: "#99ccff", points: 3 },
+      { color: "#80b3ff", points: 4 },
+      { color: "#66a3ff", points: 5 },
+      { color: "#4d94ff", points: 6 },
+      { color: "#3385ff", points: 7 },
+      { color: "#1a75ff", points: 8 },
+      { color: "#00e5ff", points: 9 },
+      { color: "#00d4b3", points: 10 },
+      { color: "#00c853", points: 12 },
+      { color: "#aeea00", points: 14 },
+      { color: "#ffd740", points: 16 },
+      { color: "#ff9100", points: 18 },
+      { color: "#ff5252", points: 20 },
+      { color: "#d500f9", points: 25 },
+    ];
+    function pickColorTier() {
+      // Weighted slightly toward lower tiers; simple uniform for now
+      const idx = Math.floor(Math.random() * colorTiers.length);
+      return colorTiers[idx];
     }
-    
-    function updateColorInputDisabled() {
-      const disabled = !!randomizeToggle.checked;
-      colorInput.disabled = disabled;
-      colorInput.style.opacity = disabled ? 0.6 : 1;
+    function renderLegend() {
+      // Grid of tier colors
+      legendGrid.innerHTML = "";
+      colorTiers.forEach((tier) => {
+        const item = document.createElement('div');
+        item.className = 'legendItem';
+        const star = document.createElement('span');
+        star.className = 'legendStar';
+        star.style.backgroundImage = `url(${createStarSVG(34, tier.color)})`;
+        const pts = document.createElement('span');
+        pts.className = 'legendPoints';
+        pts.textContent = String(tier.points);
+        item.appendChild(star);
+        item.appendChild(pts);
+        legendGrid.appendChild(item);
+      });
     }
-    randomizeToggle.addEventListener("change", updateColorInputDisabled);
-    updateColorInputDisabled();
+
+    function showScorePopup(delta) {
+      if (!delta || delta <= 0) return;
+      const pop = document.createElement('span');
+      pop.className = 'scorePopup';
+      pop.textContent = `+${delta}`;
+      scoreHud.appendChild(pop);
+      setTimeout(() => {
+        pop.remove();
+      }, 900);
+    }
 
     function resizeCanvas() {
       canvas.width = window.innerWidth;
@@ -281,11 +385,12 @@
 
     // Star object
     class Star {
-      constructor(x, y, size, color) {
+      constructor(x, y, size, color, points) {
         this.x = x;
         this.y = y;
         this.size = size;
         this.color = color;
+        this.points = points || 0;
         this.img = new Image();
         this.img.src = createStarSVG(size, color);
         this.clicked = false;
@@ -368,7 +473,7 @@
           }
 
           // Lifetime fade for hard mode
-          if (this.lifetimeMs != null && this.createdAtMs != null) {
+        if (this.lifetimeMs != null && this.createdAtMs != null) {
             const elapsed = performance.now() - this.createdAtMs;
             const remaining = this.lifetimeMs - elapsed;
             if (remaining <= 0) {
@@ -399,8 +504,14 @@
       const size = 72 + Math.random() * 120; // doubled from 36 + random*60
       const x = Math.random() * (canvas.width - size);
       const y = Math.random() * (canvas.height - size);
-      const color = gameSettings.randomizeColor ? getRandomColor() : gameSettings.shapeColor;
-      stars.push(new Star(x, y, size, color));
+      let color = "#ffffff";
+      let points = 1; // Easy mode default
+      if (gameSettings.difficulty === "medium" || gameSettings.difficulty === "hard") {
+        const tier = pickColorTier();
+        color = tier.color;
+        points = tier.points;
+      }
+      stars.push(new Star(x, y, size, color, points));
     }
 
     // Will be started when the game begins
@@ -421,6 +532,10 @@
         if (stars[i].containsPoint(x, y) && !stars[i].clicked) {
           stars[i].clicked = true;
           playPopSound(); // play gentle pop
+          const delta = stars[i].points || 0;
+          score += delta;
+          scoreHud.textContent = String(score);
+          showScorePopup(delta);
           break;
         }
       }
@@ -459,9 +574,7 @@
     // Start button behavior
     playButton.addEventListener("click", () => {
       // Read options
-      gameSettings.shapeColor = colorInput.value || "#ffffff";
       gameSettings.soundEnabled = !!soundToggle.checked;
-      gameSettings.randomizeColor = !!randomizeToggle.checked;
       const selected = difficultyInputs.find((el) => el.checked);
       gameSettings.difficulty = selected ? selected.value : "easy";
 
@@ -470,6 +583,9 @@
 
       // Start game
       isGameRunning = true;
+      score = 0;
+      scoreHud.textContent = "0";
+      scoreHud.style.display = "block"; // shown for all modes
       startSpawning();
       // Seed a few stars instantly so it feels alive
       if (stars.length === 0) {
@@ -483,11 +599,8 @@
     pauseButton.addEventListener("click", () => {
       isGameRunning = false;
       // Sync UI from current settings
-      colorInput.value = gameSettings.shapeColor;
       soundToggle.checked = !!gameSettings.soundEnabled;
-      randomizeToggle.checked = !!gameSettings.randomizeColor;
       difficultyInputs.forEach((el) => { el.checked = el.value === gameSettings.difficulty; });
-      updateColorInputDisabled();
       // Show overlay and hide pause
       startScreen.style.display = "flex";
       pauseButton.style.display = "none";
@@ -504,6 +617,7 @@
     fullscreenButton.addEventListener("click", enterFullscreen);
 
     // Kick off the render loop; it idles until the game starts
+    renderLegend();
     gameLoop();
   </script>
 </body>
