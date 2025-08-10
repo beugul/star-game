@@ -505,7 +505,7 @@
       const x = Math.random() * (canvas.width - size);
       const y = Math.random() * (canvas.height - size);
       let color = "#ffffff";
-      let points = 1; // Easy mode default
+      let points = 5; // Easy mode white stars worth 5 points (matching legend)
       if (gameSettings.difficulty === "medium" || gameSettings.difficulty === "hard") {
         const tier = pickColorTier();
         color = tier.color;
