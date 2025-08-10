@@ -186,21 +186,21 @@
     }
     .legendGrid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(122px, 1fr));
-      gap: 10px 12px;
+      grid-template-columns: repeat(4, 1fr); /* 4 columns */
+      gap: 12px 24px; /* more space between columns */
       padding: 4px 4px 8px;
     }
     .legendItem {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 6px 8px;
+      gap: 8px; /* points immediately to the right of star */
+      padding: 6px 10px;
       border-radius: 10px;
       background: rgba(0,0,0,0.15);
       border: 1px solid rgba(255,255,255,0.06);
     }
     .legendPoints {
-      margin-left: auto;
+      margin-left: 2px; /* adjacent to star */
       color: #fff;
       font-weight: 700;
     }
